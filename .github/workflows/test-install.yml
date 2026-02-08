@@ -1,0 +1,85 @@
+name: Test Installation
+
+on:
+  workflow_dispatch:  # Manual trigger from Actions tab
+  push:
+    branches:
+      - master
+    paths:
+      - 'install.sh'
+      - 'install.ps1'
+      - '.github/workflows/test-install.yml'
+
+jobs:
+  test-linux:
+    name: Test Linux Installation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download and run install script
+        run: |
+          curl -sSf https://raw.githubusercontent.com/ozx1/shrt/master/install.sh | sudo sh
+      
+      - name: Verify shrt is installed
+        run: |
+          which shrt
+          shrt --help || shrt help || echo "Help command format may vary"
+      
+      - name: Check version
+        run: |
+          shrt help
+
+  test-macos-x86:
+    name: Test macOS Installation (x86_64)
+    runs-on: macos-13  # Intel Mac
+    steps:
+      - name: Download and run install script
+        run: |
+          curl -sSf https://raw.githubusercontent.com/ozx1/shrt/master/install.sh | sh
+      
+      - name: Verify shrt is installed
+        run: |
+          which shrt
+          shrt --help || shrt help || echo "Help command format may vary"
+      
+      - name: Check version
+        run: |
+          shrt help
+
+  test-macos-arm:
+    name: Test macOS Installation (ARM64)
+    runs-on: macos-latest  # Apple Silicon Mac
+    steps:
+      - name: Download and run install script
+        run: |
+          curl -sSf https://raw.githubusercontent.com/ozx1/shrt/master/install.sh | sh
+      
+      - name: Verify shrt is installed
+        run: |
+          which shrt
+          shrt --help || shrt help || echo "Help command format may vary"
+      
+      - name: Check version
+        run: |
+          shrt help
+
+  test-windows:
+    name: Test Windows Installation
+    runs-on: windows-latest
+    steps:
+      - name: Download and run install script
+        shell: powershell
+        run: |
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          iwr https://raw.githubusercontent.com/ozx1/shrt/master/install.ps1 -UseBasicParsing | iex
+      
+      - name: Verify shrt is installed
+        shell: powershell
+        run: |
+          # Refresh PATH for current session
+          $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+          
+          # Check if shrt exists
+          Get-Command shrt -ErrorAction Stop
+          
+          # Run help
+          shrt help
