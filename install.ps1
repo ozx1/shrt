@@ -5,16 +5,18 @@ $ErrorActionPreference = "Stop"
 
 Write-Host "Installing shrt for Windows..." -ForegroundColor Green
 
-# Rest of the script...
-
 # Get latest release
 $release = Invoke-RestMethod -Uri "https://api.github.com/repos/ozx1/shrt/releases/latest"
 $version = $release.tag_name
-$downloadUrl = "https://github.com/ozx1/shrt/releases/download/$version/shrt-windows-x86_64.exe"
+$asset = $release.assets | Where-Object { $_.name -eq "shrt-windows-x86_64.exe" }
+$downloadUrl = $asset.browser_download_url
 
 Write-Host "Downloading version $version..." -ForegroundColor Cyan
 $tempFile = "$env:TEMP\shrt.exe"
-Invoke-WebRequest -Uri $downloadUrl -OutFile $tempFile
+
+# Use WebClient for direct download (avoids HTML response issues)
+$webClient = New-Object System.Net.WebClient
+$webClient.DownloadFile($downloadUrl, $tempFile)
 
 # Install to user's local bin
 $installDir = "$env:LOCALAPPDATA\Programs\shrt"
