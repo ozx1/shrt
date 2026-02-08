@@ -7,7 +7,7 @@ A simple command runner for executing predefined command sequences from JSON fil
 
 **Linux/macOS:**
 ```bash
-curl -sSf https://raw.githubusercontent.com/ozx1/shrt/mastar/install.sh | sh
+curl -sSf https://raw.githubusercontent.com/ozx1/shrt/master/install.sh | sh
 ```
 
 **Windows (PowerShell):**
