@@ -6,15 +6,23 @@ $ErrorActionPreference = "Stop"
 Write-Host "Installing shrt for Windows..." -ForegroundColor Green
 
 try {
-    # Direct download URL for the latest release
-    $downloadUrl = "https://github.com/ozx1/shrt/releases/latest/download/shrt-windows-x86_64.exe"
-    $tempFile = Join-Path $env:TEMP "shrt.exe"
+    # Get latest release info from GitHub API
+    Write-Host "Fetching latest release..." -ForegroundColor Cyan
     
-    Write-Host "Downloading from GitHub..." -ForegroundColor Cyan
-    
-    # Download using .NET WebClient
     $webClient = New-Object System.Net.WebClient
     $webClient.Headers.Add("User-Agent", "PowerShell")
+    
+    $apiResponse = $webClient.DownloadString("https://api.github.com/repos/ozx1/shrt/releases/latest")
+    $release = $apiResponse | ConvertFrom-Json
+    $version = $release.tag_name
+    
+    # Build download URL with actual version
+    $downloadUrl = "https://github.com/ozx1/shrt/releases/download/$version/shrt-windows-x86_64.exe"
+    $tempFile = Join-Path $env:TEMP "shrt.exe"
+    
+    Write-Host "Downloading version $version from GitHub..." -ForegroundColor Cyan
+    
+    # Download using WebClient (more reliable than Invoke-WebRequest)
     $webClient.DownloadFile($downloadUrl, $tempFile)
     
     Write-Host "Download complete!" -ForegroundColor Green
@@ -54,7 +62,7 @@ try {
     Write-Host "Installation failed: $_" -ForegroundColor Red
     Write-Host ""
     Write-Host "Manual installation:" -ForegroundColor Yellow
-    Write-Host "1. Download: https://github.com/ozx1/shrt/releases/latest/download/shrt-windows-x86_64.exe" -ForegroundColor Yellow
+    Write-Host "1. Download: https://github.com/ozx1/shrt/releases/download/v0.1.0/shrt-windows-x86_64.exe" -ForegroundColor Yellow
     Write-Host "2. Rename to shrt.exe" -ForegroundColor Yellow
     Write-Host "3. Move to a folder in your PATH" -ForegroundColor Yellow
     exit 1
