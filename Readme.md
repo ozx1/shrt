@@ -7,12 +7,12 @@ A simple command runner for executing predefined command sequences from JSON fil
 
 **Linux/macOS:**
 ```bash
-curl -sSf https://raw.githubusercontent.com/ozx1/shrt/main/install.sh | sh
+curl -sSf https://raw.githubusercontent.com/ozx1/shrt/mastar/install.sh | sh
 ```
 
 **Windows (PowerShell):**
 ```powershell
-iwr https://raw.githubusercontent.com/ozx1/shrt/main/install.ps1 | iex
+iwr https://raw.githubusercontent.com/ozx1/shrt/master/install.ps1 | iex
 ```
 
 Or download directly from [Releases](https://github.com/ozx1/shrt/releases)
