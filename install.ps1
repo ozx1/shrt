@@ -1,6 +1,11 @@
 $ErrorActionPreference = "Stop"
 
+# Force TLS 1.2 for older PowerShell versions
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
 Write-Host "Installing shrt for Windows..." -ForegroundColor Green
+
+# Rest of the script...
 
 # Get latest release
 $release = Invoke-RestMethod -Uri "https://api.github.com/repos/ozx1/shrt/releases/latest"
