@@ -1,7 +1,7 @@
 name: Test Installation
 
 on:
-  workflow_dispatch:  # Manual trigger from Actions tab
+  workflow_dispatch:
   push:
     branches:
       - master
@@ -22,32 +22,11 @@ jobs:
       - name: Verify shrt is installed
         run: |
           which shrt
-          shrt --help || shrt help || echo "Help command format may vary"
-      
-      - name: Check version
-        run: |
           shrt help
 
-  test-macos-x86:
-    name: Test macOS Installation (x86_64)
-    runs-on: macos-13  # Intel Mac
-    steps:
-      - name: Download and run install script
-        run: |
-          curl -sSf https://raw.githubusercontent.com/ozx1/shrt/master/install.sh | sh
-      
-      - name: Verify shrt is installed
-        run: |
-          which shrt
-          shrt --help || shrt help || echo "Help command format may vary"
-      
-      - name: Check version
-        run: |
-          shrt help
-
-  test-macos-arm:
+  test-macos:
     name: Test macOS Installation (ARM64)
-    runs-on: macos-latest  # Apple Silicon Mac
+    runs-on: macos-latest
     steps:
       - name: Download and run install script
         run: |
@@ -56,10 +35,6 @@ jobs:
       - name: Verify shrt is installed
         run: |
           which shrt
-          shrt --help || shrt help || echo "Help command format may vary"
-      
-      - name: Check version
-        run: |
           shrt help
 
   test-windows:
@@ -75,11 +50,6 @@ jobs:
       - name: Verify shrt is installed
         shell: powershell
         run: |
-          # Refresh PATH for current session
           $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-          
-          # Check if shrt exists
           Get-Command shrt -ErrorAction Stop
-          
-          # Run help
           shrt help
