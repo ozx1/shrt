@@ -1,34 +1,61 @@
 $ErrorActionPreference = "Stop"
 
-# Force TLS 1.2 for older PowerShell versions
+# Force TLS 1.2
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 Write-Host "Installing shrt for Windows..." -ForegroundColor Green
 
-# Get latest release
-$release = Invoke-RestMethod -Uri "https://api.github.com/repos/ozx1/shrt/releases/latest"
-$version = $release.tag_name
-$asset = $release.assets | Where-Object { $_.name -eq "shrt-windows-x86_64.exe" }
-$downloadUrl = $asset.browser_download_url
-
-Write-Host "Downloading version $version..." -ForegroundColor Cyan
-$tempFile = "$env:TEMP\shrt.exe"
-
-# Use WebClient for direct download (avoids HTML response issues)
-$webClient = New-Object System.Net.WebClient
-$webClient.DownloadFile($downloadUrl, $tempFile)
-
-# Install to user's local bin
-$installDir = "$env:LOCALAPPDATA\Programs\shrt"
-New-Item -ItemType Directory -Force -Path $installDir | Out-Null
-Move-Item -Force $tempFile "$installDir\shrt.exe"
-
-# Add to PATH if not already there
-$userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-if ($userPath -notlike "*$installDir*") {
-    [Environment]::SetEnvironmentVariable("Path", "$userPath;$installDir", "User")
-    Write-Host "Added to PATH. Please restart your terminal." -ForegroundColor Yellow
+try {
+    # Direct download URL for the latest release
+    $downloadUrl = "https://github.com/ozx1/shrt/releases/latest/download/shrt-windows-x86_64.exe"
+    $tempFile = Join-Path $env:TEMP "shrt.exe"
+    
+    Write-Host "Downloading from GitHub..." -ForegroundColor Cyan
+    
+    # Download using .NET WebClient
+    $webClient = New-Object System.Net.WebClient
+    $webClient.Headers.Add("User-Agent", "PowerShell")
+    $webClient.DownloadFile($downloadUrl, $tempFile)
+    
+    Write-Host "Download complete!" -ForegroundColor Green
+    
+    # Create install directory
+    $installDir = Join-Path $env:LOCALAPPDATA "Programs\shrt"
+    if (-not (Test-Path $installDir)) {
+        New-Item -ItemType Directory -Path $installDir -Force | Out-Null
+    }
+    
+    # Move file to install directory
+    $finalPath = Join-Path $installDir "shrt.exe"
+    if (Test-Path $finalPath) {
+        Remove-Item $finalPath -Force
+    }
+    Move-Item $tempFile $finalPath -Force
+    
+    Write-Host "Installed to: $finalPath" -ForegroundColor Green
+    
+    # Add to PATH
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    if ($userPath -notlike "*$installDir*") {
+        $newPath = $userPath + ";" + $installDir
+        [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
+        $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + $newPath
+        Write-Host "Added to PATH" -ForegroundColor Green
+        Write-Host "Note: You may need to restart your terminal for PATH changes to take effect" -ForegroundColor Yellow
+    } else {
+        Write-Host "Already in PATH" -ForegroundColor Green
+    }
+    
+    Write-Host ""
+    Write-Host "Installation complete!" -ForegroundColor Green
+    Write-Host "Run 'shrt help' to get started (restart your terminal first if needed)" -ForegroundColor Cyan
+    
+} catch {
+    Write-Host "Installation failed: $_" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Manual installation:" -ForegroundColor Yellow
+    Write-Host "1. Download: https://github.com/ozx1/shrt/releases/latest/download/shrt-windows-x86_64.exe" -ForegroundColor Yellow
+    Write-Host "2. Rename to shrt.exe" -ForegroundColor Yellow
+    Write-Host "3. Move to a folder in your PATH" -ForegroundColor Yellow
+    exit 1
 }
-
-Write-Host "✓ shrt installed successfully!" -ForegroundColor Green
-Write-Host "Run 'shrt help' to get started" -ForegroundColor Cyan
