@@ -1,13 +1,16 @@
 [package]
 name = "shrt"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+description = "A simple command runner that executes predefined command sequences"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/yourusername/shrt"
+keywords = ["cli", "command", "runner", "automation"]
+readme = "README.md"
 
 [dependencies]
+colored = "2.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-serde_derive = "1.0"
-open = "1.0"
-confy = "1.0"
-color-print = "0.3.7"
-colored = "3.0.0"
+confy = "0.6"
+open = "5.0"

@@ -16,7 +16,7 @@ struct Command {
 #[derive(Debug, Deserialize, Serialize)]
 struct Commands {
     #[serde(flatten)]
-    commands: HashMap<String, HashMap<String, Command>>,     
+    commands: HashMap<String, HashMap<String, Command>>,
 }
 
 #[derive(Debug)]
@@ -30,38 +30,40 @@ enum CommandType {
 struct AppConfig {
     path: Option<PathBuf>,
 }
+
 fn main() {
+    if let Err(e) = run() {
+        eprintln!("{}: {}", "Error".red(), e);
+        process::exit(1);
+    }
+}
+
+fn run() -> Result<(), String> {
     let args: Vec<String> = env::args().collect();
     let is_configured = load_file_path().is_some();
 
     if args.len() > 3 {
-        // to check the number of arguments
-        eprintln!("Too many arguments!");
-        process::exit(1);
+        return Err("Too many arguments".to_string());
     }
 
     let is_config_command = args.get(1).map_or(false, |arg| arg == "config");
+    
     if !is_configured && !is_config_command {
         println!("\n{}: Shorter is not configured yet", "Warning".yellow());
         println!(
-            "{} : \"{} config <path/to/file.json>",
+            "{}: {} config <path/to/file.json>",
             "Configuration".green(),
             args[0]
         );
-        process::exit(0);
+        return Ok(());
     } else if !is_config_command {
         if let Some(config_path) = load_file_path() {
-            if let Err(e) = validate_path(&config_path) {
-                eprintln!("{}: The path is not valid anymore", "Error".red());
-                eprintln!("{}", e);
-                eprintln!("Please re-configure the app");
-                println!(
-                    "{} : \"{} config <path/to/file.json>",
-                    "Configuration".green(),
-                    args[0]
-                );
-                process::exit(1);
-            }
+            validate_path(&config_path).map_err(|e| {
+                format!(
+                    "The configured path is no longer valid: {}\nPlease re-configure using: {} config <path/to/file.json>",
+                    e, args[0]
+                )
+            })?;
         }
     }
 
@@ -75,78 +77,98 @@ fn main() {
     };
 
     match command {
-        CommandType::Config => {
-            match args.get(2) {
-                Some(path_str) => {
-                    // User provided a new path - save it
-                    let user_path = PathBuf::from(path_str);
-                    if let Err(e) = save_file_path(user_path) {
-                        eprintln!("Error: {}", e);
-                        eprintln!("Please provide a valid path to a JSON file");
-                        process::exit(1)
-                    } else {
-                        println!("{}", "Configuration saved successfully!".green());
-                    }
-                }
-                None => {
-                    // No path provided - open existing config if configured
-                    if is_configured {
-                        if let Some(config_path) = load_file_path() {
-                            if let Err(e) = open::that(&config_path) {
-                                eprintln!("Failed to open file: {}", e);
-                                process::exit(1);
-                            }
-                            println!("Opening: {}", config_path.display());
-                        }
-                    } else {
-                        eprintln!("Error: Missing file path");
-                        eprintln!("Configure the file before opening it");
-                        eprintln!("Usage: {} config <path/to/file.json>", args[0]);
-                        process::exit(1);
-                    }
-                }
-            }
-        }
+        CommandType::Config => handle_config(&args),
         CommandType::Help => {
             print_help(&args[0]);
+            Ok(())
         }
-        CommandType::Run => {
-            match read_json() {
-                Ok(commands) => {
-                    if let Some(command) = commands.commands.get(&args[1]) {
-                        for cmd in command {
+        CommandType::Run => handle_run(&args),
+    }
+}
 
-                            println!("{:#?}",command)
-                        //     let scommand = command.get(cmd).unwrap();
-                        //     let program = &scommand.command;
-                        //     let arguments = &scommand.args;
-
-                        //     println!("command {}",cmd);
-
-                        //     let mut cmd = if cfg!(target_os = "windows") {
-                        //         let mut c = process::Command::new("cmd"); // Add process:: here
-                        //         c.args(&["/C", program]);
-                        //         c
-                        //     } else {
-                        //         process::Command::new(program)
-                        //     };
-
-                        //     cmd.args(arguments)
-                        //         .spawn()
-                        //         .expect("failed to spawn")
-                        //         .wait()
-                        //         .expect("failed to wait");
-                         }
-                    } else {
-                        eprintln!("this command is not valid");
-                        process::exit(1)
-                    }
-                }
-                Err(e) => eprintln!("Error: {}", e),
-            }
-            // TODO: implement
+fn handle_config(args: &[String]) -> Result<(), String> {
+    match args.get(2) {
+        Some(path_str) => {
+            let user_path = PathBuf::from(path_str);
+            save_file_path(user_path)?;
+            println!("{}", "Configuration saved successfully!".green());
+            Ok(())
+        }
+        None => {
+            let config_path = load_file_path()
+                .ok_or_else(|| {
+                    format!(
+                        "No configuration found\nUsage: {} config <path/to/file.json>",
+                        args[0]
+                    )
+                })?;
+            
+            open::that(&config_path)
+                .map_err(|e| format!("Failed to open file: {}", e))?;
+            
+            println!("Opening: {}", config_path.display());
+            Ok(())
         }
     }
+}
+
+fn handle_run(args: &[String]) -> Result<(), String> {
+    let commands = read_json()
+        .map_err(|e| format!("Failed to read commands file: {}", e))?;
+    
+    let command_name = &args[1];
+    let command_group = commands
+        .commands
+        .get(command_name)
+        .ok_or_else(|| format!("Command '{}' not found", command_name))?;
+
+    let mut sorted_commands: Vec<(&String, &Command)> = command_group.iter().collect();
+    sorted_commands.sort_by(|a, b| a.0.cmp(b.0));
+
+    // Keep track of working directory
+    let mut current_dir = env::current_dir()
+        .map_err(|e| format!("Failed to get current directory: {}", e))?;
+
+    for (key, cmd) in sorted_commands {
+        println!("{}: {} {:?}", "Executing".cyan(), cmd.command, cmd.args);
+
+        // Handle 'cd' specially
+        if cmd.command == "cd" {
+            if let Some(new_dir) = cmd.args.first() {
+                current_dir = current_dir.join(new_dir);
+                env::set_current_dir(&current_dir)
+                    .map_err(|e| format!("Failed to change directory to {}: {}", current_dir.display(), e))?;
+                println!("{}: {}", "Changed directory to".green(), current_dir.display());
+                continue;
+            }
+        }
+
+        let mut process_cmd = if cfg!(target_os = "windows") {
+            let mut c = process::Command::new("cmd");
+            c.args(&["/C", &cmd.command]);
+            c
+        } else {
+            process::Command::new(&cmd.command)
+        };
+
+        let status = process_cmd
+            .args(&cmd.args)
+            .current_dir(&current_dir)  // Set working directory for each command
+            .spawn()
+            .map_err(|e| format!("Failed to spawn command '{}': {}", key, e))?
+            .wait()
+            .map_err(|e| format!("Failed to wait for command '{}': {}", key, e))?;
+
+        if !status.success() {
+            return Err(format!(
+                "Command '{}' failed with exit code: {}",
+                key,
+                status.code().unwrap_or(-1)
+            ));
+        }
+    }
+
+    Ok(())
 }
 
 fn validate_path(path: &PathBuf) -> Result<(), String> {
@@ -156,7 +178,7 @@ fn validate_path(path: &PathBuf) -> Result<(), String> {
     if !path.is_file() {
         return Err("Path is not a file".to_string());
     }
-    if !is_json_file(&path) {
+    if !is_json_file(path) {
         return Err("File must have .json extension".to_string());
     }
     Ok(())
@@ -166,7 +188,8 @@ fn save_file_path(path: PathBuf) -> Result<(), String> {
     validate_path(&path)?;
 
     let config = AppConfig { path: Some(path) };
-    confy::store("shrt", "path", &config).map_err(|e| format!("Failed to store config: {}", e))
+    confy::store("shrt", "path", &config)
+        .map_err(|e| format!("Failed to store config: {}", e))
 }
 
 fn is_json_file(path: &Path) -> bool {
@@ -182,26 +205,28 @@ fn load_file_path() -> Option<PathBuf> {
 }
 
 fn print_help(app_name: &str) {
-    // TODO: add list for valid commands
-    println!("Usage: {} <command>", app_name);
-    println!("Commands:");
-    println!("  config <path>         Configure the JSON file path");
-    println!("  config                Open the config file when it's configured");
-    println!("  help / --help / -h    Show this help message");
+    println!("{}", "Shorter - Command Runner".bold());
+    println!("\n{}", "Usage:".underline());
+    println!("  {} <command>", app_name);
+    println!("\n{}", "Commands:".underline());
+    println!("  {} <path>         Configure the JSON file path", "config".green());
+    println!("  {}                Open the config file when configured", "config".green());
+    println!("  {}    Show this help message", "help / --help / -h".green());
 }
 
 fn read_json() -> Result<Commands, io::Error> {
-    if let Some(config_path) = load_file_path() {
-        let file = File::open(config_path)?;
-        let reader = BufReader::new(file);
-        let result: Commands = serde_json::from_reader(reader)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
+    let config_path = load_file_path().ok_or_else(|| {
+        io::Error::new(io::ErrorKind::NotFound, "Config file path not configured")
+    })?;
 
-        Ok(result)
-    } else {
-        Err(io::Error::new(
+    let file = File::open(&config_path).map_err(|e| {
+        io::Error::new(
             io::ErrorKind::NotFound,
-            "Config file not found",
-        ))
-    }
+            format!("Cannot open config file at {}: {}", config_path.display(), e),
+        )
+    })?;
+
+    let reader = BufReader::new(file);
+    serde_json::from_reader(reader)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("Invalid JSON: {}", e)))
 }
